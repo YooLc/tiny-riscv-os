@@ -19,6 +19,11 @@
           bc
           ncurses
           ncurses.dev
+          gcc
+          pkgsCross.riscv64.riscv-pk
+          spike
+          openocd
+          # pkgs.pkgsCross.riscv64.gcc14
         ];
 
         shellHook = ''

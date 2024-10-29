@@ -6,6 +6,14 @@ _start:
     # Initialize stack
     la sp, boot_stack_top
 
+    # Init mm
+    call mm_init
+
+    # Init threads
+    # Must init before timer interrupt is enabled
+    # Otherwise might encounter null pointer dereference in schedule
+    call task_init
+
     # set stvec = _traps
     la t0, _traps
     csrw stvec, t0
@@ -17,7 +25,7 @@ _start:
     # set first time interrupt
     call clock_set_next_event
 
-    # set sstatus[SIE] = 1
+    # set sstatus[SIE] = 1, and enable interrupts
     csrs sstatus, 0b10
 
     # Jump to start_kernel

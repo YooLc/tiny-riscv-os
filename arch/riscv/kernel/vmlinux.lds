@@ -55,6 +55,4 @@ SECTIONS
 
     /* 记录 kernel 代码的结束地址 */
     _ekernel = .;
-
-    _hello_world = .;
 }

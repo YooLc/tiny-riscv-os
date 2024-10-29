@@ -2,7 +2,7 @@
 #include "sbi.h"
 
 // QEMU 中时钟的频率是 10MHz，也就是 1 秒钟相当于 10000000 个时钟周期
-uint64_t TIMECLOCK = 10000000;
+uint64_t TIMECLOCK = 5000000;
 
 uint64_t get_cycles() {
     uint64_t cycles;

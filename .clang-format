@@ -1,0 +1,24 @@
+BasedOnStyle: Google
+IndentWidth: 4
+
+Language: Cpp
+# Force pointers to the type for C++.
+DerivePointerAlignment: false
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: false
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+NamespaceIndentation: All
+IndentAccessModifiers: false
+IndentCaseLabels: true
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 2
+AllowShortCaseLabelsOnASingleLine: true
+BreakAdjacentStringLiterals: false
+BreakBeforeBinaryOperators: All
+ColumnLimit: 100

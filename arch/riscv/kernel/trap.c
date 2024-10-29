@@ -1,5 +1,6 @@
 #include "stdint.h"
 #include "printk.h"
+#include "defs.h"
 
 #define SUPERVISOR_TIMER_INTERRUPT 5
 
@@ -17,5 +18,7 @@ void trap_handler(uint64_t scause, uint64_t sepc) {
     if (interrupt && exception_code == SUPERVISOR_TIMER_INTERRUPT) {
         printk("Timer Interrupt %llx, %llx\n", interrupt, exception_code);
         clock_set_next_event();
+
+        do_timer();
     }
 }

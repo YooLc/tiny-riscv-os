@@ -1,2 +1,5 @@
 fw_jump.*
 *.o
+.gdb_history
+*.log
+.vscode/
