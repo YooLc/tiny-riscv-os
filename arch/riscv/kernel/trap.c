@@ -1,12 +1,13 @@
-#include "stdint.h"
-#include "printk.h"
 #include "defs.h"
+#include "printk.h"
+#include "proc.h"
+#include "stdint.h"
 
 #define SUPERVISOR_TIMER_INTERRUPT 5
 
 void trap_handler(uint64_t scause, uint64_t sepc) {
     // 通过 `scause` 判断 trap 类型
-    uint64_t interrupt = (scause >> 63) & 0b1;
+    uint64_t interrupt      = (scause >> 63) & 0b1;
     uint64_t exception_code = (scause & 0x7FFFFFFF);
 
     printk("Interrupt %llx, %llx\n", scause, sepc);

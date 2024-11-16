@@ -3,13 +3,14 @@
 #include "defs.h"
 #include "mm.h"
 #include "printk.h"
+#include "sbi.h"
 #include "stdlib.h"
 
 extern void __dummy();
 
-struct task_struct* idle;              // idle process
-struct task_struct* current;  // 指向当前运行线程的 task_struct
-struct task_struct* task[NR_TASKS];    // 线程数组，所有的线程都保存在此
+struct task_struct* idle;            // idle process
+struct task_struct* current;         // 指向当前运行线程的 task_struct
+struct task_struct* task[NR_TASKS];  // 线程数组，所有的线程都保存在此
 
 void task_init() {
     srand(2024);
@@ -165,7 +166,7 @@ void schedule() {
     }
 
     // Switch to next process
-    Log(BLUE "switch to [PID = %lld PRIORITY = %lld COUNTER = %lld]" CLEAR, next->pid, next->priority,
-        next->counter);
+    Log(BLUE "switch to [PID = %lld PRIORITY = %lld COUNTER = %lld]" CLEAR, next->pid,
+        next->priority, next->counter);
     switch_to(next);
 }
