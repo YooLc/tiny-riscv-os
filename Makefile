@@ -11,7 +11,7 @@ ABI		:=	lp64
 TEST_SCHED  :=  0
 
 INCLUDE	:=	-I $(shell pwd)/include -I $(shell pwd)/arch/riscv/include
-CF		:=	-march=$(ISA) -mabi=$(ABI) -mcmodel=medany -fno-builtin -ffunction-sections -fdata-sections -nostartfiles -nostdlib -nostdinc -static -lgcc -Wl,--nmagic -Wl,--gc-sections -g
+CF		:=	-march=$(ISA) -mabi=$(ABI) -mcmodel=medany -fno-builtin -ffunction-sections -fdata-sections -nostartfiles -nostdlib -nostdinc -static -lgcc -Wl,--nmagic -Wl,--gc-sections -g -fno-pie
 CFLAG	:=	$(CF) $(INCLUDE) -fno-stack-protector -DTEST_SCHED=$(TEST_SCHED)
 
 .PHONY:all run debug clean
@@ -46,7 +46,7 @@ spike_run: all
 
 spike_debug: all
 	@echo Launch spike for debug...
-	@spike -H --rbb-port=9824 --kernel=arch/riscv/boot/Image $(SPIKE_CONFIG)/fw_jump.elf
+	@spike --halted --rbb-port=9824 --kernel=arch/riscv/boot/Image ./fw_jump.elf
 
 spike_bridge:
 	@echo Launch OpenOCD...
