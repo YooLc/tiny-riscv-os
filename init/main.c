@@ -2,8 +2,6 @@
 #include "sbi.h"
 #include "defs.h"
 
-extern void test();
-
 int start_kernel() {
     printk("2024 ZJU Operating System\n");
 

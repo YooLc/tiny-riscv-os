@@ -37,7 +37,7 @@ void setup_vm() {
      **/
     Log("setup_vm: start");
     const uint64_t huge_page = 0x40000000;  // 1 GiB
-    for (uint64_t i = 0; i < VM_SIZE; i += huge_page) {
+    for (uint64_t i = 0; i < PHY_SIZE; i += huge_page) {
         // 9 bit vpn
         uint64_t identity_vpn   = ((PHY_START + i) >> 30) & 0x1ff;
         uint64_t direct_map_vpn = ((VM_START + i) >> 30) & 0x1ff;
@@ -46,7 +46,7 @@ void setup_vm() {
                direct_map_vpn, direct_map_vpn, create_pte(PHY_START + i));
 
         // Create page table entry
-        early_pgtbl[identity_vpn]   = create_pte(PHY_START + i);
+        // early_pgtbl[identity_vpn]   = create_pte(PHY_START + i);
         early_pgtbl[direct_map_vpn] = create_pte(PHY_START + i);
         Log("early_pgtbl[%lx] = %lx", identity_vpn, early_pgtbl[identity_vpn]);
     }
@@ -122,7 +122,7 @@ void create_mapping(uint64_t* pgtbl, uint64_t va, uint64_t pa, uint64_t sz, uint
             return;
         }
 
-        pte[vpn[0]] = (cur_ppn << 10) | perm | PERM_A;
+        pte[vpn[0]] = (cur_ppn << 10) | perm;
     }
 }
 
@@ -133,21 +133,21 @@ void setup_vm_final() {
 
     // mapping kernel text X|-|R|V
     create_mapping(swapper_pg_dir, (uint64_t)_stext, (uint64_t)(_stext - PA2VA_OFFSET),
-                   (_etext - _stext), PERM_X | PERM_R | PERM_V);
+                   (_etext - _stext), PERM_A | PERM_X | PERM_R | PERM_V);
 
     // mapping kernel rodata -|-|R|V
     create_mapping(swapper_pg_dir, (uint64_t)_srodata, (uint64_t)(_srodata - PA2VA_OFFSET),
-                   (_erodata - _srodata), PERM_R | PERM_V);
+                   (_erodata - _srodata), PERM_A | PERM_R | PERM_V);
 
     // mapping other memory -|W|R|V
     // Set dirty bit for modified pages
     create_mapping(swapper_pg_dir, (uint64_t)_sdata, (uint64_t)(_sdata - PA2VA_OFFSET),
-                   (_edata - _sdata), PERM_W | PERM_R | PERM_V);
+                   (_edata - _sdata), PERM_A | PERM_W | PERM_R | PERM_V);
     create_mapping(swapper_pg_dir, (uint64_t)_sbss, (uint64_t)(_sbss - PA2VA_OFFSET),
-                   (_ebss - _sbss), PERM_D | PERM_W | PERM_R | PERM_V);
+                   (_ebss - _sbss), PERM_A | PERM_D | PERM_W | PERM_R | PERM_V);
     create_mapping(swapper_pg_dir, (uint64_t)_ekernel, (uint64_t)(_ekernel - PA2VA_OFFSET),
                    (PHY_SIZE - (uint64_t)(_ekernel - PA2VA_OFFSET - PHY_START)),
-                   PERM_D | PERM_W | PERM_R | PERM_V);
+                   PERM_A | PERM_D | PERM_W | PERM_R | PERM_V);
 
     // set satp with swapper_pg_dir
     uint64_t swapper_pg_dir_pa = (uint64_t)swapper_pg_dir - PA2VA_OFFSET;

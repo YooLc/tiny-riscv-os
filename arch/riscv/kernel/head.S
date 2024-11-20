@@ -43,6 +43,12 @@ _start:
     call start_kernel
 
 relocate:
+    # set stvec
+    la t0, tmp_stvec
+    li t1, PA2VA_OFFSET
+    add t0, t0, t1
+    csrw stvec, t0
+
     # set ra = ra + PA2VA_OFFSET
     # set sp = sp + PA2VA_OFFSET (If you have set the sp before)
     li a0, PA2VA_OFFSET
@@ -62,6 +68,7 @@ relocate:
 
     # set satp with early_pgtbl
     csrw satp, a0
+tmp_stvec:
     ret
 
     .section .bss.stack

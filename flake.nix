@@ -17,7 +17,7 @@
                 then self.stdenv
                 else prev.overrideCC self.stdenv final.buildPackages.gcc14;
             })).overrideAttrs (oldAttrs:
-              let snapshot = "20241026"; in
+              let snapshot = "20241116"; in
               rec {
                 name = "gcc-${version}";
                 version = "14.0.0-dev.${snapshot}";
@@ -51,7 +51,8 @@
           pkgsCross.riscv64.riscv-pk
           spike
           openocd
-          pkgs.pkgsCross.riscv64.gcc14 # This will now refer to the overridden version
+          pkgs.pkgsCross.riscv64.gcc13
+          # pkgs.pkgsCross.riscv64.gcc14 # This will now refer to the overridden version
         ];
 
         shellHook = ''
