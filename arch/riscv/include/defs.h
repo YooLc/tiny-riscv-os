@@ -23,6 +23,7 @@ void clock_set_next_event();
 #define PHY_END           (PHY_START + PHY_SIZE)
 
 #define PGSIZE            0x1000             // 4 KiB
+#define PGSHIFT           12
 #define PGROUNDUP(addr)   ((addr + PGSIZE - 1) & (~(PGSIZE - 1)))
 #define PGROUNDDOWN(addr) (addr & (~(PGSIZE - 1)))
 
@@ -43,5 +44,21 @@ void clock_set_next_event();
 #define PERM_A            0b1000000L
 #define PERM_D            0b10000000L
 #define PPN_MASK          0xfffffffffffL
+
+#define USER_START        (0x0000000000000000)  // user space start virtual address
+#define USER_END          (0x0000004000000000)  // user space end virtual address
+
+// When an SRET instruction (see Section 3.3.2) is executed to return from the trap handler, the
+// privilege level is set to user mode if the SPP bit is 0, or supervisor mode if the SPP bit is 1;
+// SPP is then set to 0.
+#define SSTATUS_SPP  (1L << 8)
+#define SSTATUS_SPIE (1L << 5)
+#define SSTATUS_SIE  (1L << 1)
+#define SSTATUS_SUM  (1L << 18)
+
+struct pt_regs {
+    uint64_t x[32];
+    uint64_t sepc;
+};
 
 #endif

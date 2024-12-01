@@ -58,6 +58,12 @@ SECTIONS
         *(.data .data.*)
         
         _edata = .;
+
+        . = ALIGN(0x1000);
+        _sramdisk = .;
+        *(.uapp .uapp*)
+        _eramdisk = .;
+        . = ALIGN(0x1000);
     } >ramv AT>ram
 
     .bss : ALIGN(0x1000) {

@@ -5,8 +5,15 @@
 #include "printk.h"
 #include "sbi.h"
 #include "stdlib.h"
+#include "string.h"
+#include "vm.h"
 
 extern void __dummy();
+extern uint64_t swapper_pg_dir;
+extern uint8_t _sramdisk[];
+extern uint8_t _eramdisk[];
+
+extern void __switch_to(struct task_struct* prev, struct task_struct* next);
 
 struct task_struct* idle;            // idle process
 struct task_struct* current;         // 指向当前运行线程的 task_struct
@@ -50,8 +57,27 @@ void task_init() {
         // 3. 为 task[1] ~ task[NR_TASKS - 1] 设置 thread_struct 中的 ra 和 sp
         //     - ra 设置为 __dummy（见 4.2.2）的地址
         //     - sp 设置为该线程申请的物理页的高地址
-        task[i]->thread.ra = (uint64_t)__dummy;
-        task[i]->thread.sp = (uint64_t)((uint8_t*)task[i] + PGSIZE);
+        //     - sepc: USER_START
+        //     - sstatus: SPP = 0, SUM = 1
+        //     - sscratch: U-Mode sp = USER_END
+        task[i]->thread.ra       = (uint64_t)__dummy;
+        task[i]->thread.sp       = (uint64_t)((uint8_t*)task[i] + PGSIZE);
+        task[i]->thread.sepc     = USER_START;
+        task[i]->thread.sstatus  = SSTATUS_SUM | SSTATUS_SIE;
+        task[i]->thread.sscratch = USER_END;
+
+        // User Space Page Table
+        task[i]->pgd = alloc_page();
+        memcpy((void*)task[i]->pgd, (const void*)swapper_pg_dir, PGSIZE);
+        // Copy uapp binary, init user space stack
+        uint64_t need_pages  = (_eramdisk - _sramdisk + PGSIZE - 1) / PGSIZE;
+        uint64_t* user_space = (uint64_t*)alloc_pages(need_pages);
+        uint64_t* user_stack = (uint64_t*)alloc_page();
+        memcpy((void*)user_space, (const void*)_sramdisk, (_eramdisk - _sramdisk));
+        create_mapping(task[i]->pgd, USER_START, (uint64_t)user_space, need_pages * PGSIZE,
+                       PERM_A | PERM_U | PERM_R | PERM_W | PERM_X | PERM_V);
+        create_mapping(task[i]->pgd, USER_END - PGSIZE, (uint64_t)user_stack, PGSIZE,
+                       PERM_A | PERM_U | PERM_R | PERM_W | PERM_V);
     }
 
     printk("...task_init done!\n");
@@ -102,7 +128,14 @@ void dummy() {
     }
 }
 
-extern void __switch_to(struct task_struct* prev, struct task_struct* next);
+void switch_mm(struct task_struct* next) {
+    // Prepare satp
+    uint64_t satp;
+    satp = (((uint64_t)next->pgd >> PGSHIFT) & PPN_MASK) | (0x8L << 60);
+    asm volatile("csrw satp, %0" : : "r"(satp));
+    // flush tlb and icache
+    asm volatile("sfence.vma");
+}
 
 void switch_to(struct task_struct* next) {
     if (next == current) return;
@@ -112,6 +145,7 @@ void switch_to(struct task_struct* next) {
     // switch to next process
     struct task_struct* prev = current;
     current                  = next;
+    switch_mm(next);
     __switch_to(prev, next);
 }
 

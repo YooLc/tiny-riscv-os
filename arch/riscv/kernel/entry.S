@@ -13,7 +13,19 @@
     ld x\id, (\id * 8)(sp)
 .endm
 
+.macro switch_stack
+    csrr t0, sscratch
+    # switch only if sscratch != 0
+    bnez t0, 1f
+    csrw sscratch, sp
+    mv sp, t0
+1:  # local label
+.endm
+
 _traps:
+    # 0. switch to kernel stack
+    switch_stack
+
     # 1. save 32 registers and sepc to stack
     addi sp, sp, -(32 + 1) * 8
     .altmacro
@@ -42,7 +54,10 @@ _traps:
     load_register 2 # restore sp(x2)
     addi sp, sp, (32 + 1) * 8
 
-    # 4. return from trap
+    # 4. switch back to user stack
+    switch_stack
+
+    # 5. return from trap
     sret
 
     .extern dummy
@@ -52,7 +67,10 @@ __dummy:
     la t0, dummy
     csrw sepc, t0
 
-    # 2. return fron s-mode
+    # 2. swap sp (kernel stack) and sscratch (user stack)
+    switch_stack
+
+    # 3. return fron s-mode
     sret
 
     .globl __switch_to
@@ -74,6 +92,14 @@ __switch_to:
     sd ra, task_struct_offset_thread(a0)
     sd sp, (task_struct_offset_thread + 8)(a0)
 
+    # store sepc, sstatus and sscratch
+    csrr t0, sepc
+    csrr t1, sstatus
+    csrr t2, sscratch
+    sd t0, (task_struct_offset_thread + 8 * 14)(a0)
+    sd t1, (task_struct_offset_thread + 8 * 15)(a0)
+    sd t2, (task_struct_offset_thread + 8 * 16)(a0)
+
     # restore state from next process
     ld s0, (task_struct_offset_thread + 8 * 2)(a1) # restore callee-saved registers
     ld s1, (task_struct_offset_thread + 8 * 3)(a1)
@@ -87,6 +113,14 @@ __switch_to:
     ld s9, (task_struct_offset_thread + 8 * 11)(a1)
     ld s10, (task_struct_offset_thread + 8 * 12)(a1)
     ld s11, (task_struct_offset_thread + 8 * 13)(a1)
+
+    # restore sepc, sstatus and sscratch
+    ld t0, (task_struct_offset_thread + 8 * 14)(a1)
+    ld t1, (task_struct_offset_thread + 8 * 15)(a1)
+    ld t2, (task_struct_offset_thread + 8 * 16)(a1)
+    csrw sepc, t0
+    csrw sstatus, t1
+    csrw sscratch, t2
 
     ld ra, task_struct_offset_thread(a1)
     ld sp, (task_struct_offset_thread + 8)(a1)

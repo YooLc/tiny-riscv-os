@@ -18,6 +18,7 @@ CFLAG	:=	$(CF) $(INCLUDE) -fno-stack-protector -DTEST_SCHED=$(TEST_SCHED)
 all: clean
 	$(MAKE) -C lib all
 	$(MAKE) -C init all
+	$(MAKE) -C user all
 	$(MAKE) -C arch/riscv all
 	@echo -e '\n'Build Finished OK
 
@@ -32,6 +33,7 @@ debug: all
 clean:
 	$(MAKE) -C lib clean
 	$(MAKE) -C init clean
+	$(MAKE) -C user clean
 	$(MAKE) -C arch/riscv clean
 	$(shell test -f vmlinux && rm vmlinux)
 	$(shell test -f vmlinux.asm && rm vmlinux.asm)

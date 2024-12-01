@@ -3,12 +3,12 @@
 #include "proc.h"
 #include "stdint.h"
 
-#define SUPERVISOR_TIMER_INTERRUPT 5
-#define SUPERVISOR_INST_PAGE_FAULT 12
-#define SUPERVISOR_LOAD_PAGE_FAULT 13
+#define SUPERVISOR_TIMER_INTERRUPT  5
+#define SUPERVISOR_INST_PAGE_FAULT  12
+#define SUPERVISOR_LOAD_PAGE_FAULT  13
 #define SUPERVISOR_STORE_PAGE_FAULT 15
 
-void trap_handler(uint64_t scause, uint64_t sepc) {
+void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs* regs) {
     // 通过 `scause` 判断 trap 类型
     uint64_t interrupt      = (scause >> 63) & 0b1;
     uint64_t exception_code = (scause & 0x7FFFFFFF);
