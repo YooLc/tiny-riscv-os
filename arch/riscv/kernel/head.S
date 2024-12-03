@@ -37,7 +37,8 @@ _start:
     call clock_set_next_event
 
     # set sstatus[SIE] = 1, and enable interrupts
-    csrs sstatus, 0b10
+    # csrs sstatus, 0b10
+    # Once enter user-mode, the interrupt will be enabled automatically
 
     # Jump to start_kernel
     call start_kernel

@@ -15,8 +15,8 @@
 
 .macro switch_stack
     csrr t0, sscratch
-    # switch only if sscratch != 0
-    bnez t0, 1f
+    # switch only if sscratch == 0
+    beqz t0, 1f
     csrw sscratch, sp
     mv sp, t0
 1:  # local label
@@ -27,7 +27,7 @@ _traps:
     switch_stack
 
     # 1. save 32 registers and sepc to stack
-    addi sp, sp, -(32 + 1) * 8
+    addi sp, sp, -(32 + 2) * 8
     .altmacro
     .set i, 0
     .rept 32
@@ -36,13 +36,18 @@ _traps:
     .endr
     csrr t0, sepc
     sd t0, (32 * 8)(sp)
+    csrr t0, sstatus
+    sd t0, (33 * 8)(sp)
 
     # 2. call trap_handler
     csrr a0, scause
     csrr a1, sepc
+    mv a2, sp
     call trap_handler
 
     # 3. restore sepc and 32 registers (x2(sp) should be restore last) from stack
+    ld t0, (33 * 8)(sp)
+    csrw sstatus, t0
     ld t0, (32 * 8)(sp)
     csrw sepc, t0
     load_register 1
@@ -64,8 +69,8 @@ _traps:
     .globl __dummy
 __dummy:
     # 1. set sepc to dummy()
-    la t0, dummy
-    csrw sepc, t0
+    # la t0, dummy
+    # csrw sepc, t0
 
     # 2. swap sp (kernel stack) and sscratch (user stack)
     switch_stack

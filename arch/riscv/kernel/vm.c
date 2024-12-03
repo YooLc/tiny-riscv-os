@@ -14,6 +14,8 @@ extern uint8_t _edata[];
 extern uint8_t _sbss[];
 extern uint8_t _ebss[];
 extern uint8_t _ekernel[];
+extern uint8_t _sramdisk[];
+extern uint8_t _eramdisk[];
 
 /* early_pgtbl: 用于 setup_vm 进行 1GiB 的映射 */
 uint64_t early_pgtbl[512] __attribute__((__aligned__(0x1000)));
@@ -123,6 +125,7 @@ void create_mapping(uint64_t* pgtbl, uint64_t va, uint64_t pa, uint64_t sz, uint
         }
 
         pte[vpn[0]] = (cur_ppn << 10) | perm;
+        // Log("Created mapping %lx -> %lx, perm: %lx", cur_va, cur_pa, perm);
     }
 }
 
@@ -149,6 +152,10 @@ void setup_vm_final() {
                    (PHY_SIZE - (uint64_t)(_ekernel - PA2VA_OFFSET - PHY_START)),
                    PERM_A | PERM_D | PERM_W | PERM_R | PERM_V);
 
+    // Set up ramdisk
+    create_mapping(swapper_pg_dir, (uint64_t)_sramdisk, (uint64_t)(_sramdisk - PA2VA_OFFSET),
+                   (_eramdisk - _sramdisk), PERM_A | PERM_R | PERM_W | PERM_X | PERM_V);
+
     // set satp with swapper_pg_dir
     uint64_t swapper_pg_dir_pa = (uint64_t)swapper_pg_dir - PA2VA_OFFSET;
     uint64_t satp              = (0x8L << 60) | ((swapper_pg_dir_pa >> 12) & PPN_MASK);
@@ -156,5 +163,7 @@ void setup_vm_final() {
 
     // flush TLB
     asm volatile("sfence.vma zero, zero");
+
+    printk("...setup_vm_final: done\n");
     return;
 }

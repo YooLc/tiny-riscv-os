@@ -56,9 +56,18 @@ void clock_set_next_event();
 #define SSTATUS_SIE  (1L << 1)
 #define SSTATUS_SUM  (1L << 18)
 
+#define REG_IDX_A0   10
+#define REG_IDX_A1   11
+#define REG_IDX_A2   12
+#define REG_IDX_A3   13
+#define REG_IDX_A4   14
+#define REG_IDX_A5   15
+#define REG_IDX_A6   16
+#define REG_IDX_A7   17
 struct pt_regs {
     uint64_t x[32];
     uint64_t sepc;
+    uint64_t sstatus;
 };
 
 #endif

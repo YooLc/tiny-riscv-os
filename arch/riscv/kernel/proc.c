@@ -9,7 +9,7 @@
 #include "vm.h"
 
 extern void __dummy();
-extern uint64_t swapper_pg_dir;
+extern uint64_t swapper_pg_dir[];
 extern uint8_t _sramdisk[];
 extern uint8_t _eramdisk[];
 
@@ -67,17 +67,19 @@ void task_init() {
         task[i]->thread.sscratch = USER_END;
 
         // User Space Page Table
-        task[i]->pgd = alloc_page();
-        memcpy((void*)task[i]->pgd, (const void*)swapper_pg_dir, PGSIZE);
+        uint8_t* pgd = (uint8_t*)alloc_page();
+        task[i]->pgd = (uint64_t*)(pgd - PA2VA_OFFSET);
+        memcpy((void*)pgd, (const void*)swapper_pg_dir, PGSIZE);
+
         // Copy uapp binary, init user space stack
-        uint64_t need_pages  = (_eramdisk - _sramdisk + PGSIZE - 1) / PGSIZE;
-        uint64_t* user_space = (uint64_t*)alloc_pages(need_pages);
-        uint64_t* user_stack = (uint64_t*)alloc_page();
+        uint64_t need_pages = (_eramdisk - _sramdisk + PGSIZE - 1) / PGSIZE;
+        uint8_t* user_space = (uint8_t*)alloc_pages(need_pages);
+        uint8_t* user_stack = (uint8_t*)alloc_page();
         memcpy((void*)user_space, (const void*)_sramdisk, (_eramdisk - _sramdisk));
-        create_mapping(task[i]->pgd, USER_START, (uint64_t)user_space, need_pages * PGSIZE,
-                       PERM_A | PERM_U | PERM_R | PERM_W | PERM_X | PERM_V);
-        create_mapping(task[i]->pgd, USER_END - PGSIZE, (uint64_t)user_stack, PGSIZE,
-                       PERM_A | PERM_U | PERM_R | PERM_W | PERM_V);
+        create_mapping((uint64_t*)pgd, USER_START, (uint64_t)(user_space - PA2VA_OFFSET),
+                       need_pages * PGSIZE, PERM_A | PERM_U | PERM_R | PERM_W | PERM_X | PERM_V);
+        create_mapping((uint64_t*)pgd, USER_END - PGSIZE, (uint64_t)(user_stack - PA2VA_OFFSET),
+                       PGSIZE, PERM_A | PERM_U | PERM_R | PERM_W | PERM_V);
     }
 
     printk("...task_init done!\n");
@@ -140,8 +142,8 @@ void switch_mm(struct task_struct* next) {
 void switch_to(struct task_struct* next) {
     if (next == current) return;
 
-    Log("Switching from %p (counter: %lld) to %p (counter: %lld)", current, current->counter, next,
-        next->counter);
+    // Log("Switching from %p (counter: %lld) to %p (counter: %lld)", current, current->counter,
+    // next, next->counter);
     // switch to next process
     struct task_struct* prev = current;
     current                  = next;
@@ -152,22 +154,22 @@ void switch_to(struct task_struct* next) {
 void do_timer() {
     // 1. 如果当前线程是 idle 线程或当前线程时间片耗尽则直接进行调度
     if (current == idle || current->counter == 0) {
-        Log("branch 0 switch to");
+        // Log("branch 0 switch to");
         schedule();
     } else {
         // 2. 否则对当前线程的运行剩余时间减 1，若剩余时间仍然大于 0
         // 则直接返回，否则进行调度
         current->counter--;
-        Log("Thread running, reducing counter %lld", current->counter);
+        // Log("Thread running, reducing counter %lld", current->counter);
         if (current->counter == 0) {
-            Log("branch 1 switch to");
+            // Log("branch 1 switch to");
             schedule();
         }
     }
 }
 
 void schedule() {
-    Log("Scheduling threads");
+    // Log("Scheduling threads");
 
     struct task_struct* next = idle;
 
