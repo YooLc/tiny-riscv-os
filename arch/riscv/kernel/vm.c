@@ -71,6 +71,7 @@ void create_mapping(uint64_t* pgtbl, uint64_t va, uint64_t pa, uint64_t sz, uint
      * 可以使用 V bit 来判断页表项是否存在
      **/
     uint64_t ppn[3], vpn[3];
+    Log("Creating mapping %lx -> %lx, size: %lx, perm: %lx", va, pa, sz, perm);
     // Page table walk: PGD -> PMD -> PTE
     for (uint64_t offset = 0; offset < sz; offset += PGSIZE) {
         uint64_t cur_pa  = pa + offset;

@@ -1,6 +1,7 @@
 #include "proc.h"
 
 #include "defs.h"
+#include "elf.h"
 #include "mm.h"
 #include "printk.h"
 #include "sbi.h"
@@ -18,6 +19,55 @@ extern void __switch_to(struct task_struct* prev, struct task_struct* next);
 struct task_struct* idle;            // idle process
 struct task_struct* current;         // 指向当前运行线程的 task_struct
 struct task_struct* task[NR_TASKS];  // 线程数组，所有的线程都保存在此
+
+// https://man7.org/linux/man-pages/man5/elf.5.html
+void load_elf(struct task_struct* task) {
+    Log("Loading ELF for task %p", task);
+    Elf64_Ehdr* ehdr  = (Elf64_Ehdr*)_sramdisk;
+    Elf64_Phdr* phdrs = (Elf64_Phdr*)(_sramdisk + ehdr->e_phoff);
+    // Log("Entry: %p", ehdr->e_entry);
+    // Log("Program Headers: %p", ehdr->e_phoff);
+
+    // Load every program header
+    for (size_t i = 0; i < ehdr->e_phnum; i++) {
+        // Log("Loading segment %d", i);
+        Elf64_Phdr* phdr = phdrs + i;
+        if (phdr->p_type != PT_LOAD) continue;
+        uint8_t* seg_start = _sramdisk + phdr->p_offset;
+
+        // memsz may differ from filesz
+        uint64_t seg_filesz = phdr->p_filesz;
+        uint64_t seg_memsz  = phdr->p_memsz;
+        // Log("Start %p, filesz %p, memsz %p", seg_start, seg_filesz, seg_memsz);
+
+        // Allocate memory for this segment
+        uint64_t in_page_offset = phdr->p_vaddr & (PGSIZE - 1);
+        uint64_t need_pages     = (in_page_offset + seg_memsz + PGSIZE - 1) / PGSIZE;
+        uint8_t* segment        = (uint8_t*)alloc_pages(need_pages);
+        // Log("Allocated %d pages at %p", need_pages, segment);
+
+        // Copy program to memory
+#pragma unroll(8)
+        for (size_t t = 0; t < seg_filesz; t++) {
+            segment[t + in_page_offset] = seg_start[t];
+        }
+        // Log("Copied program into memory, in page offset %p", in_page_offset);
+
+        // Get permission
+        uint64_t perm = PERM_A | PERM_U | PERM_V;
+        if (phdr->p_flags & PF_R) perm |= PERM_R;
+        if (phdr->p_flags & PF_W) perm |= PERM_W;
+        if (phdr->p_flags & PF_X) perm |= PERM_X;
+        // Log("Permission: %p", perm);
+
+        // Create memory mapping
+        // Log("Mapping %p to %p", phdr->p_vaddr, (uint64_t)(segment - PA2VA_OFFSET));
+        create_mapping((uint64_t*)(task->pgd + PA2VA_OFFSET), phdr->p_vaddr,
+                       (uint64_t)(segment - PA2VA_OFFSET), need_pages * PGSIZE, perm);
+        // Log("Mapped %p to %p", phdr->p_vaddr, segment);
+    }
+    task->thread.sepc = ehdr->e_entry;
+}
 
 void task_init() {
     srand(2024);
@@ -68,16 +118,18 @@ void task_init() {
 
         // User Space Page Table
         uint8_t* pgd = (uint8_t*)alloc_page();
-        task[i]->pgd = (uint64_t*)(pgd - PA2VA_OFFSET);
+        task[i]->pgd = pgd - PA2VA_OFFSET;
         memcpy((void*)pgd, (const void*)swapper_pg_dir, PGSIZE);
 
+        load_elf(task[i]);
+
         // Copy uapp binary, init user space stack
-        uint64_t need_pages = (_eramdisk - _sramdisk + PGSIZE - 1) / PGSIZE;
-        uint8_t* user_space = (uint8_t*)alloc_pages(need_pages);
+        // uint64_t need_pages = (_eramdisk - _sramdisk + PGSIZE - 1) / PGSIZE;
+        // uint8_t* user_space = (uint8_t*)alloc_pages(need_pages);
         uint8_t* user_stack = (uint8_t*)alloc_page();
-        memcpy((void*)user_space, (const void*)_sramdisk, (_eramdisk - _sramdisk));
-        create_mapping((uint64_t*)pgd, USER_START, (uint64_t)(user_space - PA2VA_OFFSET),
-                       need_pages * PGSIZE, PERM_A | PERM_U | PERM_R | PERM_W | PERM_X | PERM_V);
+        // memcpy((void*)user_space, (const void*)_sramdisk, (_eramdisk - _sramdisk));
+        // create_mapping((uint64_t*)pgd, USER_START, (uint64_t)(user_space - PA2VA_OFFSET),
+        //                need_pages * PGSIZE, PERM_A | PERM_U | PERM_R | PERM_W | PERM_X | PERM_V);
         create_mapping((uint64_t*)pgd, USER_END - PGSIZE, (uint64_t)(user_stack - PA2VA_OFFSET),
                        PGSIZE, PERM_A | PERM_U | PERM_R | PERM_W | PERM_V);
     }

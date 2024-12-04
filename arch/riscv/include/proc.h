@@ -31,7 +31,7 @@ struct task_struct {
     uint64_t pid;       // 线程 id
 
     struct thread_struct thread;
-    uint64_t* pgd;      // User Space Page Table
+    uint8_t* pgd;       // User Space Page Table
 };
 
 /* 线程初始化，创建 NR_TASKS 个线程 */
