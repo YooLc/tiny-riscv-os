@@ -25,8 +25,8 @@ void load_elf(struct task_struct* task) {
     Log("Loading ELF for task %p", task);
     Elf64_Ehdr* ehdr  = (Elf64_Ehdr*)_sramdisk;
     Elf64_Phdr* phdrs = (Elf64_Phdr*)(_sramdisk + ehdr->e_phoff);
-    // Log("Entry: %p", ehdr->e_entry);
-    // Log("Program Headers: %p", ehdr->e_phoff);
+    Log("Entry: %p", ehdr->e_entry);
+    Log("Program Headers: %p", ehdr->e_phoff);
 
     // Load every program header
     for (size_t i = 0; i < ehdr->e_phnum; i++) {
@@ -38,7 +38,7 @@ void load_elf(struct task_struct* task) {
         // memsz may differ from filesz
         uint64_t seg_filesz = phdr->p_filesz;
         uint64_t seg_memsz  = phdr->p_memsz;
-        // Log("Start %p, filesz %p, memsz %p", seg_start, seg_filesz, seg_memsz);
+        Log("Start %p, filesz %p, memsz %p", seg_start, seg_filesz, seg_memsz);
 
         // Allocate memory for this segment
         uint64_t in_page_offset = phdr->p_vaddr & (PGSIZE - 1);
@@ -47,14 +47,11 @@ void load_elf(struct task_struct* task) {
         // Log("Allocated %d pages at %p", need_pages, segment);
 
         // Copy program to memory
-#pragma unroll(8)
-        for (size_t t = 0; t < seg_filesz; t++) {
-            segment[t + in_page_offset] = seg_start[t];
-        }
+        memcpy((void*)(segment + in_page_offset), (const void*)seg_start, seg_filesz);
         // Log("Copied program into memory, in page offset %p", in_page_offset);
 
         // Get permission
-        uint64_t perm = PERM_A | PERM_U | PERM_V;
+        uint64_t perm = PERM_A | PERM_D | PERM_U | PERM_V;
         if (phdr->p_flags & PF_R) perm |= PERM_R;
         if (phdr->p_flags & PF_W) perm |= PERM_W;
         if (phdr->p_flags & PF_X) perm |= PERM_X;
@@ -112,8 +109,8 @@ void task_init() {
         //     - sscratch: U-Mode sp = USER_END
         task[i]->thread.ra       = (uint64_t)__dummy;
         task[i]->thread.sp       = (uint64_t)((uint8_t*)task[i] + PGSIZE);
-        task[i]->thread.sepc     = USER_START;
-        task[i]->thread.sstatus  = SSTATUS_SUM | SSTATUS_SIE;
+        // task[i]->thread.sepc     = USER_START;
+        task[i]->thread.sstatus  = SSTATUS_SUM;
         task[i]->thread.sscratch = USER_END;
 
         // User Space Page Table
@@ -131,7 +128,7 @@ void task_init() {
         // create_mapping((uint64_t*)pgd, USER_START, (uint64_t)(user_space - PA2VA_OFFSET),
         //                need_pages * PGSIZE, PERM_A | PERM_U | PERM_R | PERM_W | PERM_X | PERM_V);
         create_mapping((uint64_t*)pgd, USER_END - PGSIZE, (uint64_t)(user_stack - PA2VA_OFFSET),
-                       PGSIZE, PERM_A | PERM_U | PERM_R | PERM_W | PERM_V);
+                       PGSIZE, PERM_A | PERM_D | PERM_U | PERM_R | PERM_W | PERM_V);
     }
 
     printk("...task_init done!\n");

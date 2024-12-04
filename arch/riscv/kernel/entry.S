@@ -19,7 +19,7 @@
     beqz t0, 1f
     csrw sscratch, sp
     mv sp, t0
-1:  # local label
+1:  # local symbol
 .endm
 
 _traps:
