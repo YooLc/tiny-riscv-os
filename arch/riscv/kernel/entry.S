@@ -14,11 +14,10 @@
 .endm
 
 .macro switch_stack
-    csrr t0, sscratch
-    # switch only if sscratch == 0
-    beqz t0, 1f
-    csrw sscratch, sp
-    mv sp, t0
+    csrrw sp, sscratch, sp
+    bnez sp, 1f
+    # switch back if sscratch == 0
+    csrrw sp, sscratch, sp
 1:  # local symbol
 .endm
 
