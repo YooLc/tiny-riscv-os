@@ -2,6 +2,7 @@
 #define __PROC_H__
 
 #include "stdint.h"
+#include "vm.h"
 
 #if TEST_SCHED
 #define NR_TASKS (1 + 4)  // 测试时线程数量
@@ -25,13 +26,14 @@ struct thread_struct {
 
 /* 线程数据结构 */
 struct task_struct {
-    uint64_t state;     // 线程状态
-    uint64_t counter;   // 运行剩余时间
-    uint64_t priority;  // 运行优先级 1 最低 10 最高
-    uint64_t pid;       // 线程 id
+    uint64_t state;    
+    uint64_t counter; 
+    uint64_t priority; 
+    uint64_t pid;    
 
     struct thread_struct thread;
-    uint8_t* pgd;       // User Space Page Table
+    uint8_t *pgd;
+    struct mm_struct mm;
 };
 
 /* 线程初始化，创建 NR_TASKS 个线程 */

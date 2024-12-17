@@ -33,35 +33,20 @@ void load_elf(struct task_struct* task) {
         // Log("Loading segment %d", i);
         Elf64_Phdr* phdr = phdrs + i;
         if (phdr->p_type != PT_LOAD) continue;
-        uint8_t* seg_start = _sramdisk + phdr->p_offset;
 
         // memsz may differ from filesz
-        uint64_t seg_filesz = phdr->p_filesz;
-        uint64_t seg_memsz  = phdr->p_memsz;
-        Log("Start %p, filesz %p, memsz %p", seg_start, seg_filesz, seg_memsz);
-
-        // Allocate memory for this segment
-        uint64_t in_page_offset = phdr->p_vaddr & (PGSIZE - 1);
-        uint64_t need_pages     = (in_page_offset + seg_memsz + PGSIZE - 1) / PGSIZE;
-        uint8_t* segment        = (uint8_t*)alloc_pages(need_pages);
-        // Log("Allocated %d pages at %p", need_pages, segment);
-
-        // Copy program to memory
-        memcpy((void*)(segment + in_page_offset), (const void*)seg_start, seg_filesz);
-        // Log("Copied program into memory, in page offset %p", in_page_offset);
+        uint64_t filesz = phdr->p_filesz;
+        uint64_t memsz  = phdr->p_memsz;
+        uint64_t pgoff = phdr->p_offset; // ffset from the beginning of the file at which the first byte of the segment resides
+        uint64_t addr = phdr->p_vaddr; // virtual address at which the first byte of the segment resides in memory.
 
         // Get permission
-        uint64_t perm = PERM_A | PERM_D | PERM_U | PERM_V;
-        if (phdr->p_flags & PF_R) perm |= PERM_R;
-        if (phdr->p_flags & PF_W) perm |= PERM_W;
-        if (phdr->p_flags & PF_X) perm |= PERM_X;
-        // Log("Permission: %p", perm);
+        uint64_t flags = 0;
+        if (phdr->p_flags & PF_R) flags |= VM_READ;
+        if (phdr->p_flags & PF_W) flags |= VM_WRITE;
+        if (phdr->p_flags & PF_X) flags |= VM_EXEC;
 
-        // Create memory mapping
-        // Log("Mapping %p to %p", phdr->p_vaddr, (uint64_t)(segment - PA2VA_OFFSET));
-        create_mapping((uint64_t*)(task->pgd + PA2VA_OFFSET), phdr->p_vaddr,
-                       (uint64_t)(segment - PA2VA_OFFSET), need_pages * PGSIZE, perm);
-        // Log("Mapped %p to %p", phdr->p_vaddr, segment);
+        do_mmap(&task->mm, addr, memsz, pgoff, filesz, flags);
     }
     task->thread.sepc = ehdr->e_entry;
 }
@@ -121,14 +106,10 @@ void task_init() {
         load_elf(task[i]);
 
         // Copy uapp binary, init user space stack
-        // uint64_t need_pages = (_eramdisk - _sramdisk + PGSIZE - 1) / PGSIZE;
-        // uint8_t* user_space = (uint8_t*)alloc_pages(need_pages);
-        uint8_t* user_stack = (uint8_t*)alloc_page();
-        // memcpy((void*)user_space, (const void*)_sramdisk, (_eramdisk - _sramdisk));
-        // create_mapping((uint64_t*)pgd, USER_START, (uint64_t)(user_space - PA2VA_OFFSET),
-        //                need_pages * PGSIZE, PERM_A | PERM_U | PERM_R | PERM_W | PERM_X | PERM_V);
-        create_mapping((uint64_t*)pgd, USER_END - PGSIZE, (uint64_t)(user_stack - PA2VA_OFFSET),
-                       PGSIZE, PERM_A | PERM_D | PERM_U | PERM_R | PERM_W | PERM_V);
+        // uint8_t* user_stack = (uint8_t*)alloc_page();
+        // create_mapping((uint64_t*)pgd, USER_END - PGSIZE, (uint64_t)(user_stack - PA2VA_OFFSET),
+        //                PGSIZE, PERM_A | PERM_D | PERM_U | PERM_R | PERM_W | PERM_V);
+        do_mmap(&task[i]->mm, USER_END - PGSIZE, PGSIZE, 0, 0, VM_READ | VM_WRITE | VM_ANON);
     }
 
     printk("...task_init done!\n");

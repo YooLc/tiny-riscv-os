@@ -1,6 +1,9 @@
 #include "syscall.h"
 #include "stdio.h"
 
+// What??
+#define SYS_CLONE 220
+
 #define WAIT_TIME 0x4FFFFFFF
 
 static inline long getpid() {

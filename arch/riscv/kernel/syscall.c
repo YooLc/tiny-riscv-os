@@ -9,8 +9,9 @@
 extern struct task_struct* current;
 
 syscall_t syscall_table[] = {
-    [64]  = sys_write,
-    [172] = sys_getpid,
+    [SYS_WRITE]  = sys_write,
+    [SYS_GETPID] = sys_getpid,
+    [SYS_CLONE]  = sys_clone,
 };
 
 void syscall_handler(struct pt_regs* regs) {
@@ -43,5 +44,10 @@ void sys_write(struct pt_regs* regs) {
 // uint64_t sys_getpid()
 void sys_getpid(struct pt_regs* regs) {
     regs->x[REG_IDX_A0] = current->pid;
+    return;
+}
+
+void sys_clone(struct pt_regs* regs) {
+    // do_fork(regs);
     return;
 }

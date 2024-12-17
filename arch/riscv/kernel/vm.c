@@ -1,6 +1,9 @@
+#include "vm.h"
+
 #include "defs.h"
 #include "mm.h"
 #include "printk.h"
+#include "proc.h"
 #include "stddef.h"
 #include "stdint.h"
 #include "string.h"
@@ -16,6 +19,11 @@ extern uint8_t _ebss[];
 extern uint8_t _ekernel[];
 extern uint8_t _sramdisk[];
 extern uint8_t _eramdisk[];
+
+extern struct task_struct* current;
+
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 /* early_pgtbl: 用于 setup_vm 进行 1GiB 的映射 */
 uint64_t early_pgtbl[512] __attribute__((__aligned__(0x1000)));
@@ -71,7 +79,8 @@ void create_mapping(uint64_t* pgtbl, uint64_t va, uint64_t pa, uint64_t sz, uint
      * 可以使用 V bit 来判断页表项是否存在
      **/
     uint64_t ppn[3], vpn[3];
-    Log("Creating mapping %lx -> %lx, size: %lx, perm: %lx", va, pa, sz, perm);
+    Log("Creating mapping [%p, %p) -> [%p, %p), size: %lx, perm: %lx, pgtbl: %p", pa, pa + sz, va,
+        va + sz, sz, perm, pgtbl);
     // Page table walk: PGD -> PMD -> PTE
     for (uint64_t offset = 0; offset < sz; offset += PGSIZE) {
         uint64_t cur_pa  = pa + offset;
@@ -166,5 +175,123 @@ void setup_vm_final() {
     asm volatile("sfence.vma zero, zero");
 
     printk("...setup_vm_final: done\n");
+    return;
+}
+
+/*
+ * @mm       : current thread's mm_struct
+ * @addr     : the va to look up
+ *
+ * @return   : the VMA if found or NULL if not found
+ */
+struct vm_area_struct* find_vma(struct mm_struct* mm, uint64_t addr) {
+    struct vm_area_struct* cur_vma = mm->mmap;
+    while (cur_vma != NULL) {
+        if (cur_vma->vm_start <= addr && addr < cur_vma->vm_end) {
+            return cur_vma;
+        }
+        cur_vma = cur_vma->vm_next;
+    }
+    return NULL;
+}
+
+/*
+ * @mm       : current thread's mm_struct
+ * @addr     : the va to map
+ * @len      : memory size to map
+ * @vm_pgoff : phdr->p_offset
+ * @vm_filesz: phdr->p_filesz
+ * @flags    : flags for the new VMA
+ *
+ * @return   : start va
+ */
+uint64_t do_mmap(struct mm_struct* mm, uint64_t addr, uint64_t len, uint64_t vm_pgoff,
+                 uint64_t vm_filesz, uint64_t flags) {
+    Log("[S] Doing mmap: %p %p %x %x %x %x", mm, addr, len, vm_pgoff, vm_filesz, flags);
+    struct vm_area_struct* cur_vma = (struct vm_area_struct*)kalloc(sizeof(struct vm_area_struct));
+
+    if (cur_vma == NULL) {
+        Err("[S] failed to do mmap because of memory shortage, can't allocate vma");
+    }
+
+    // Initialize vm_area_struct
+    *cur_vma = (struct vm_area_struct){
+        .vm_mm     = mm,
+        .vm_start  = addr,
+        .vm_end    = addr + len,
+        .vm_pgoff  = vm_pgoff,
+        .vm_filesz = vm_filesz,
+        .vm_flags  = flags,
+    };
+
+    // Insert to Linked List
+    cur_vma->vm_next = mm->mmap;
+    cur_vma->vm_prev = NULL;
+    if (mm->mmap != NULL) mm->mmap->vm_prev = cur_vma;
+    mm->mmap = cur_vma;
+
+    // Log("[S] ...do_mmap done");
+    return addr;
+}
+
+void do_page_fault(struct pt_regs* regs) {
+    Log("[S] Handling Page Fault, sepc = %p, stval = %p, scause = %p", regs->sepc, csr_read(stval),
+        csr_read(scause));
+
+    uint64_t bad_addr          = csr_read(stval);
+    struct vm_area_struct* vma = find_vma(&current->mm, bad_addr);
+    if (vma == NULL) {
+        Err("[S] Panic: address not found in VMA");
+    }
+
+    uint64_t exception_code = (csr_read(scause) & 0x7FFFFFFF);
+    // Check for permission
+    switch (exception_code) {
+        case SUPERVISOR_INST_PAGE_FAULT:
+            if (vma->vm_flags & VM_EXEC) break;
+            Err("[S] Panic: Executing instructions on pages without VM_EXEC permission");
+            break;
+        case SUPERVISOR_STORE_PAGE_FAULT:
+            if (vma->vm_flags & VM_WRITE) break;
+            Err("[S] Panic: Writing to pages without VM_WRITE permission");
+            break;
+        case SUPERVISOR_LOAD_PAGE_FAULT:
+            if (vma->vm_flags & VM_READ) break;
+            Err("[S] Panic: Reading pages without VM_READ permission");
+            break;
+    };
+
+    Log("[S] Found vma: vm_start: %p, vm_end: %p", vma->vm_start, vma->vm_end);
+
+    // Allocate one page;
+    uint8_t* page = (uint8_t*)alloc_page();
+
+    Log("[S] Allocated Page: %p", page);
+    uint64_t vpage_start   = PGROUNDDOWN(bad_addr);
+    uint64_t vpage_end     = PGROUNDUP(bad_addr + 1);
+    uint64_t vaddr_start   = MAX(vpage_start, vma->vm_start);
+    uint64_t vaddr_end     = MIN(vpage_end, vma->vm_end);
+    int64_t in_page_offset = vaddr_start - vpage_start;
+
+    if ((vma->vm_flags & VM_ANON) == 0) {  // Segment from file
+        // Copy from file
+        uint64_t seg_offset = vaddr_start - vma->vm_start;
+        uint64_t seg_copysz = vaddr_end - vaddr_start;
+        uint8_t* page_start = page;
+        if (in_page_offset > 0) page_start += in_page_offset;
+        uint8_t* file_start = _sramdisk + vma->vm_pgoff + seg_offset;
+
+        Log("[S] Copying file: [%p, %p) -> [%p, %p), page_start: %p, in_page_offset: %p",
+            file_start, file_start + seg_copysz, page_start, page_start + seg_copysz,
+            page + seg_offset, in_page_offset);
+        memcpy((void*)page_start, (void*)file_start, seg_copysz);
+    }
+
+    uint64_t page_perm = vma->vm_flags & ~VM_ANON;
+
+    // Must set PERM_U! otherwise would stuck at page fault in s-mode
+    create_mapping((uint64_t*)(current->pgd + PA2VA_OFFSET), (uint64_t)vpage_start,
+                   (uint64_t)(page - PA2VA_OFFSET), PGSIZE,
+                   PERM_A | PERM_D | PERM_U | page_perm | PERM_V);
     return;
 }

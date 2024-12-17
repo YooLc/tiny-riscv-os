@@ -70,4 +70,11 @@ struct pt_regs {
     uint64_t sstatus;
 };
 
+// Supervisor Traps
+#define SUPERVISOR_TIMER_INTERRUPT  5
+#define SUPERVISOR_ECALL_FROM_USER  8
+#define SUPERVISOR_INST_PAGE_FAULT  12
+#define SUPERVISOR_LOAD_PAGE_FAULT  13
+#define SUPERVISOR_STORE_PAGE_FAULT 15
+
 #endif

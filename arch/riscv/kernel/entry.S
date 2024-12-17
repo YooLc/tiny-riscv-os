@@ -25,7 +25,7 @@ _traps:
     # 0. switch to kernel stack
     switch_stack
 
-    # 1. save 32 registers and sepc to stack
+    # 1. save 32 registers and sepc, sstatus to stack
     addi sp, sp, -(32 + 2) * 8
     .altmacro
     .set i, 0
@@ -56,7 +56,7 @@ _traps:
         .set i, i + 1
     .endr
     load_register 2 # restore sp(x2)
-    addi sp, sp, (32 + 1) * 8
+    addi sp, sp, (32 + 2) * 8
 
     # 4. switch back to user stack
     switch_stack
