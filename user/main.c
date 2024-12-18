@@ -37,7 +37,7 @@ int main() {
 
 /* PFH main #2 */
 #elif defined(PFH2)
-char global_placeholder[0x1000];
+char global_placeholder[0x1000] __attribute__((aligned(4096)));
 unsigned long global_increment = 0;
 
 int main() {

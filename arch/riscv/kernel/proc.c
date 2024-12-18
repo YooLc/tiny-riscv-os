@@ -39,7 +39,7 @@ void load_elf(struct task_struct* task) {
         // memsz may differ from filesz
         uint64_t filesz = phdr->p_filesz;
         uint64_t memsz  = phdr->p_memsz;
-        uint64_t pgoff = phdr->p_offset;  // ffset from the beginning of the file at which the first
+        uint64_t pgoff = phdr->p_offset;  // offset from the beginning of the file at which the first
                                           // byte of the segment resides
         uint64_t addr = phdr->p_vaddr;    // virtual address at which the first byte of the segment
                                           // resides in memory.
@@ -79,7 +79,7 @@ void task_init() {
 
     // 1. 参考 idle 的设置，为 task[1] ~ task[NR_TASKS - 1] 进行初始化
 #ifndef FORK1
-    size_t up_limit = 2;
+    size_t up_limit = NR_TASKS;
 #else
     size_t up_limit = 2;
 #endif
@@ -245,7 +245,7 @@ void schedule() {
 }
 
 uint64_t do_fork(struct pt_regs* regs) {
-    Log("[S] " YELLOW "Forking process" CLEAR);
+    Log("[S] " YELLOW "Forking process" BLUE " %d -> %d" CLEAR, current->pid, nr_tasks);
 
     struct task_struct* child = (struct task_struct*)alloc_page();
     // 1. Copy kernel stack - deep copy task_struct

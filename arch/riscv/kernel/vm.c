@@ -236,7 +236,7 @@ uint64_t do_mmap(struct mm_struct* mm, uint64_t addr, uint64_t len, uint64_t vm_
 }
 
 void do_page_fault(struct pt_regs* regs) {
-    Log("[S] Handling Page Fault, sepc = %p, stval = %p, scause = %p", regs->sepc, csr_read(stval),
+    Log("[S] " YELLOW "Handling Page Fault" BLUE " sepc = %p, stval = %p, scause = %p", regs->sepc, csr_read(stval),
         csr_read(scause));
 
     uint64_t bad_addr          = csr_read(stval);
