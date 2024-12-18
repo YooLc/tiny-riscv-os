@@ -1,35 +1,24 @@
-#include "syscall.h"
 #include "stdio.h"
+#include "syscall.h"
 
 // What??
 #define SYS_CLONE 220
 
-#define WAIT_TIME 0x4FFFFFFF
+#define WAIT_TIME 0x4FFFFFF
 
 static inline long getpid() {
     long ret;
-    asm volatile ("li a7, %1\n"
-                  "ecall\n"
-                  "mv %0, a0\n"
-                : "+r" (ret) 
-                : "i" (SYS_GETPID));
+    asm volatile("li a7, %1\n" "ecall\n" "mv %0, a0\n" : "+r"(ret) : "i"(SYS_GETPID));
     return ret;
 }
 
 static inline long fork() {
     long ret;
-    asm volatile ("li a7, %1\n"
-                  "ecall\n"
-                  "mv %0, a0\n"
-                : "+r" (ret)
-                : "i" (SYS_CLONE));
-  return ret;
+    asm volatile("li a7, %1\n" "ecall\n" "mv %0, a0\n" : "+r"(ret) : "i"(SYS_CLONE));
+    return ret;
 }
 
-void wait(unsigned int n) {
-    for (unsigned int i = 0; i < n; i++);
-}
-
+void wait(unsigned int n) { for (unsigned int i = 0; i < n; i++); }
 
 /*************** Test Page Fault Handler ***************/
 /* PFH main #1 */
@@ -37,9 +26,10 @@ void wait(unsigned int n) {
 int counter = 0;
 
 int main() {
-    register void *current_sp __asm__("sp");
+    register void* current_sp __asm__("sp");
     while (1) {
-        printf("[U-MODE] pid: %ld, sp is %p, this is print No.%d\n", getpid(), current_sp, ++counter);
+        printf("[U-MODE] pid: %ld, sp is %p, this is print No.%d\n", getpid(), current_sp,
+               ++counter);
         for (unsigned int i = 0; i < 0x4FFFFFFF; i++);
     }
     return 0;
@@ -69,14 +59,16 @@ int main() {
 
     if (pid == 0) {
         while (1) {
-            printf("[U-CHILD] pid: %ld is running! global_variable: %d\n", getpid(), global_variable++);
+            printf("[U-CHILD] pid: %ld is running! global_variable: %d\n", getpid(),
+                   global_variable++);
             wait(WAIT_TIME);
-        } 
+        }
     } else {
         while (1) {
-            printf("[U-PARENT] pid: %ld is running! global_variable: %d\n", getpid(), global_variable++);
+            printf("[U-PARENT] pid: %ld is running! global_variable: %d\n", getpid(),
+                   global_variable++);
             wait(WAIT_TIME);
-        } 
+        }
     }
     return 0;
 }
@@ -111,15 +103,17 @@ int main() {
     if (pid == 0) {
         printf("[U-CHILD] pid: %ld is running! Message: %s\n", getpid(), &placeholder[4096]);
         while (1) {
-            printf("[U-CHILD] pid: %ld is running! global_variable: %d\n", getpid(), global_variable++);
+            printf("[U-CHILD] pid: %ld is running! global_variable: %d\n", getpid(),
+                   global_variable++);
             wait(WAIT_TIME);
-        } 
+        }
     } else {
         printf("[U-PARENT] pid: %ld is running! Message: %s\n", getpid(), &placeholder[4096]);
         while (1) {
-            printf("[U-PARENT] pid: %ld is running! global_variable: %d\n", getpid(), global_variable++);
+            printf("[U-PARENT] pid: %ld is running! global_variable: %d\n", getpid(),
+                   global_variable++);
             wait(WAIT_TIME);
-        } 
+        }
     }
     return 0;
 }
@@ -129,7 +123,6 @@ int main() {
 int global_variable = 0;
 
 int main() {
-
     printf("[U] pid: %ld is running! global_variable: %d\n", getpid(), global_variable++);
     fork();
     fork();
@@ -137,7 +130,7 @@ int main() {
     printf("[U] pid: %ld is running! global_variable: %d\n", getpid(), global_variable++);
     fork();
 
-    while(1) {
+    while (1) {
         printf("[U] pid: %ld is running! global_variable: %d\n", getpid(), global_variable++);
         wait(WAIT_TIME);
     }
@@ -147,7 +140,7 @@ int main() {
 
 int main() {
     printf("No test function specified.\n");
-    while(1);
+    while (1);
     return 0;
 }
 

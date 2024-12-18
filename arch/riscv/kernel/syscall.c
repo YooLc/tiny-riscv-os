@@ -48,6 +48,6 @@ void sys_getpid(struct pt_regs* regs) {
 }
 
 void sys_clone(struct pt_regs* regs) {
-    // do_fork(regs);
+    regs->x[REG_IDX_A0] = do_fork(regs);
     return;
 }

@@ -44,6 +44,10 @@ _traps:
     mv a2, sp
     call trap_handler
 
+    # This is where child process resumes
+    .globl __ret_from_fork
+__ret_from_fork:
+
     # 3. restore sepc and 32 registers (x2(sp) should be restore last) from stack
     ld t0, (33 * 8)(sp)
     csrw sstatus, t0

@@ -26,13 +26,13 @@ struct thread_struct {
 
 /* 线程数据结构 */
 struct task_struct {
-    uint64_t state;    
-    uint64_t counter; 
-    uint64_t priority; 
-    uint64_t pid;    
+    uint64_t state;
+    uint64_t counter;
+    uint64_t priority;
+    uint64_t pid;
 
     struct thread_struct thread;
-    uint8_t *pgd;
+    uint8_t* pgd;
     struct mm_struct mm;
 };
 
@@ -50,5 +50,7 @@ void switch_to(struct task_struct* next);
 
 /* dummy funciton: 一个循环程序，循环输出自己的 pid 以及一个自增的局部变量 */
 void dummy();
+
+uint64_t do_fork(struct pt_regs*);
 
 #endif

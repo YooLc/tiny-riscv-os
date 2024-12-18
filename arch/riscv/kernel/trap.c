@@ -18,7 +18,6 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs* regs) {
         switch (exception_code) {
             case SUPERVISOR_TIMER_INTERRUPT:
             default:
-                // Log("Timer Interrupt %llx, %llx", interrupt, exception_code);
                 clock_set_next_event();
                 do_timer();
                 break;
@@ -31,11 +30,10 @@ void trap_handler(uint64_t scause, uint64_t sepc, struct pt_regs* regs) {
                 // Err("[S] Page Fault %llx, %llx at %p", interrupt, exception_code, sepc);
                 do_page_fault(regs);
                 break;
-            case SUPERVISOR_ECALL_FROM_USER:
-                syscall_handler(regs);
-                break;
+            case SUPERVISOR_ECALL_FROM_USER: syscall_handler(regs); break;
             default:
-                Err("[S] Unknown interrupt/exception %llx, %llx at %p, stval=%llx", interrupt, exception_code, sepc, csr_read(stval));
+                Err("[S] Unknown interrupt/exception %llx, %llx at %p, stval=%llx", interrupt,
+                    exception_code, sepc, csr_read(stval));
                 break;
         }
     }

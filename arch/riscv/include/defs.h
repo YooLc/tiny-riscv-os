@@ -56,6 +56,8 @@ void clock_set_next_event();
 #define SSTATUS_SIE  (1L << 1)
 #define SSTATUS_SUM  (1L << 18)
 
+#define REG_IDX_RA   1
+#define REG_IDX_SP   2
 #define REG_IDX_A0   10
 #define REG_IDX_A1   11
 #define REG_IDX_A2   12

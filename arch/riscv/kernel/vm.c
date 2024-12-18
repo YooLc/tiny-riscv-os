@@ -134,6 +134,7 @@ void create_mapping(uint64_t* pgtbl, uint64_t va, uint64_t pa, uint64_t sz, uint
             return;
         }
 
+        // Log("pgd: %p, pgd[%x] = %x", pgtbl, vpn[2], pgtbl[vpn[2]]);
         pte[vpn[0]] = (cur_ppn << 10) | perm;
         // Log("Created mapping %lx -> %lx, perm: %lx", cur_va, cur_pa, perm);
     }
@@ -261,12 +262,10 @@ void do_page_fault(struct pt_regs* regs) {
             break;
     };
 
-    Log("[S] Found vma: vm_start: %p, vm_end: %p", vma->vm_start, vma->vm_end);
+    Log("[S] Valid page fault for vma: [%p, %p)", vma->vm_start, vma->vm_end);
 
     // Allocate one page;
-    uint8_t* page = (uint8_t*)alloc_page();
-
-    Log("[S] Allocated Page: %p", page);
+    uint8_t* page          = (uint8_t*)alloc_page();
     uint64_t vpage_start   = PGROUNDDOWN(bad_addr);
     uint64_t vpage_end     = PGROUNDUP(bad_addr + 1);
     uint64_t vaddr_start   = MAX(vpage_start, vma->vm_start);
@@ -294,4 +293,43 @@ void do_page_fault(struct pt_regs* regs) {
                    (uint64_t)(page - PA2VA_OFFSET), PGSIZE,
                    PERM_A | PERM_D | PERM_U | page_perm | PERM_V);
     return;
+}
+
+/**
+ * @pgtbl: page table base address
+ * @va: virtual address
+ *
+ * Return 0 if page table entry not found
+ */
+uint64_t find_pte(uint64_t* pgtbl, uint64_t va) {
+    uint64_t vpn[3];
+
+    // Page table walk: PGD -> PMD -> PTE
+    // Calculate VPN
+    vpn[0] = (va >> 12) & 0x1ff;
+    vpn[1] = (va >> 21) & 0x1ff;
+    vpn[2] = (va >> 30) & 0x1ff;
+
+    uint64_t *pmd = NULL, *pte = NULL;
+    // Check if PGD entry valid
+    if (pgtbl[vpn[2]] & PERM_V) {
+        uint64_t pmd_ppn = (pgtbl[vpn[2]] >> 10) & PPN_MASK;
+        uint64_t pmd_pa  = (pmd_ppn << 12);
+
+        pmd = (uint64_t*)(pmd_pa + PA2VA_OFFSET);
+    } else {
+        return 0;
+    }
+
+    // Check if PMD entry valid
+    if (pmd[vpn[1]] & PERM_V) {
+        uint64_t pte_ppn = (pmd[vpn[1]] >> 10) & PPN_MASK;
+        uint64_t pte_pa  = (pte_ppn << 12);
+
+        pte = (uint64_t*)(pte_pa + PA2VA_OFFSET);
+    } else {
+        return 0;
+    }
+
+    return pte[vpn[0]];
 }
