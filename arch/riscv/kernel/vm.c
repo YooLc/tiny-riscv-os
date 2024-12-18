@@ -242,18 +242,27 @@ void do_page_fault(struct pt_regs* regs) {
     uint64_t bad_addr          = csr_read(stval);
     struct vm_area_struct* vma = find_vma(&current->mm, bad_addr);
     if (vma == NULL) {
-        Err("[S] Panic: address not found in VMA");
+        Err("[S] Panic: address %p not found in VMA", bad_addr);
     }
 
     uint64_t exception_code = (csr_read(scause) & 0x7FFFFFFF);
+
     // Check for permission
+    int is_cow    = 0;
+    uint64_t* pte = NULL;
     switch (exception_code) {
         case SUPERVISOR_INST_PAGE_FAULT:
             if (vma->vm_flags & VM_EXEC) break;
             Err("[S] Panic: Executing instructions on pages without VM_EXEC permission");
             break;
         case SUPERVISOR_STORE_PAGE_FAULT:
-            if (vma->vm_flags & VM_WRITE) break;
+            if (vma->vm_flags & VM_WRITE) {
+                /* Check for Copy On Write */
+                pte = find_pte((uint64_t*)(current->pgd + PA2VA_OFFSET), PGROUNDDOWN(bad_addr));
+                // CoW: pte available, not writable but VM_WRITE is set
+                if (pte) is_cow = ((*pte & PERM_V) && ((*pte & PERM_W) == 0));
+                break;
+            }
             Err("[S] Panic: Writing to pages without VM_WRITE permission");
             break;
         case SUPERVISOR_LOAD_PAGE_FAULT:
@@ -264,34 +273,48 @@ void do_page_fault(struct pt_regs* regs) {
 
     Log("[S] Valid page fault for vma: [%p, %p)", vma->vm_start, vma->vm_end);
 
-    // Allocate one page;
-    uint8_t* page          = (uint8_t*)alloc_page();
-    uint64_t vpage_start   = PGROUNDDOWN(bad_addr);
-    uint64_t vpage_end     = PGROUNDUP(bad_addr + 1);
-    uint64_t vaddr_start   = MAX(vpage_start, vma->vm_start);
-    uint64_t vaddr_end     = MIN(vpage_end, vma->vm_end);
-    int64_t in_page_offset = vaddr_start - vpage_start;
+    uint8_t* page        = (uint8_t*)alloc_page();
+    uint64_t vpage_start = PGROUNDDOWN(bad_addr);
+    uint64_t vpage_end   = PGROUNDUP(bad_addr + 1);
+    uint64_t page_perm   = vma->vm_flags & ~VM_ANON;
 
-    if ((vma->vm_flags & VM_ANON) == 0) {  // Segment from file
-        // Copy from file
-        uint64_t seg_offset = vaddr_start - vma->vm_start;
-        uint64_t seg_copysz = vaddr_end - vaddr_start;
-        uint8_t* page_start = page;
-        if (in_page_offset > 0) page_start += in_page_offset;
-        uint8_t* file_start = _sramdisk + vma->vm_pgoff + seg_offset;
+    if (is_cow) {
+        uint64_t src = (((*pte >> 10) & PPN_MASK) << 12) + PA2VA_OFFSET;
 
-        Log("[S] Copying file: [%p, %p) -> [%p, %p), page_start: %p, in_page_offset: %p",
-            file_start, file_start + seg_copysz, page_start, page_start + seg_copysz,
-            page + seg_offset, in_page_offset);
-        memcpy((void*)page_start, (void*)file_start, seg_copysz);
+        Log("[S] " YELLOW "Cow: " BLUE "copying frame [%p, %p) to [%p, %p)", src - PA2VA_OFFSET,
+            src + PGSIZE - PA2VA_OFFSET, page - PA2VA_OFFSET, page + PGSIZE - PA2VA_OFFSET);
+        memcpy((void*)page, (void*)src, PGSIZE);
+        put_page((void*)src);
+        create_mapping((uint64_t*)(current->pgd + PA2VA_OFFSET), vpage_start,
+                       (uint64_t)(page - PA2VA_OFFSET), PGSIZE,
+                       PERM_A | PERM_D | PERM_U | page_perm | PERM_V);
+    } else {
+        // Allocate one page;
+        uint64_t vaddr_start   = MAX(vpage_start, vma->vm_start);
+        uint64_t vaddr_end     = MIN(vpage_end, vma->vm_end);
+        int64_t in_page_offset = vaddr_start - vpage_start;
+
+        if ((vma->vm_flags & VM_ANON) == 0) {  // Segment from file
+            // Copy from file
+            uint64_t seg_offset = vaddr_start - vma->vm_start;
+            uint64_t seg_copysz = vaddr_end - vaddr_start;
+            uint8_t* page_start = page;
+            if (in_page_offset > 0) page_start += in_page_offset;
+            uint8_t* file_start = _sramdisk + vma->vm_pgoff + seg_offset;
+
+            Log("[S] Copying file: [%p, %p) -> [%p, %p), page_start: %p, in_page_offset: %p",
+                file_start, file_start + seg_copysz, page_start, page_start + seg_copysz,
+                page + seg_offset, in_page_offset);
+            memcpy((void*)page_start, (void*)file_start, seg_copysz);
+        }
+
+        // Must set PERM_U! otherwise would stuck at page fault in s-mode
+        create_mapping((uint64_t*)(current->pgd + PA2VA_OFFSET), (uint64_t)vpage_start,
+                       (uint64_t)(page - PA2VA_OFFSET), PGSIZE,
+                       PERM_A | PERM_D | PERM_U | page_perm | PERM_V);
     }
-
-    uint64_t page_perm = vma->vm_flags & ~VM_ANON;
-
-    // Must set PERM_U! otherwise would stuck at page fault in s-mode
-    create_mapping((uint64_t*)(current->pgd + PA2VA_OFFSET), (uint64_t)vpage_start,
-                   (uint64_t)(page - PA2VA_OFFSET), PGSIZE,
-                   PERM_A | PERM_D | PERM_U | page_perm | PERM_V);
+    // Flush TLB to make new mapping take effect
+    asm volatile("sfence.vma");
     return;
 }
 
@@ -301,7 +324,7 @@ void do_page_fault(struct pt_regs* regs) {
  *
  * Return 0 if page table entry not found
  */
-uint64_t find_pte(uint64_t* pgtbl, uint64_t va) {
+uint64_t* find_pte(uint64_t* pgtbl, uint64_t va) {
     uint64_t vpn[3];
 
     // Page table walk: PGD -> PMD -> PTE
@@ -331,5 +354,5 @@ uint64_t find_pte(uint64_t* pgtbl, uint64_t va) {
         return 0;
     }
 
-    return pte[vpn[0]];
+    return &pte[vpn[0]];
 }

@@ -5,7 +5,7 @@
 #include "stdint.h"
 
 void create_mapping(uint64_t*, uint64_t, uint64_t, uint64_t, uint64_t);
-uint64_t find_pte(uint64_t*, uint64_t);
+uint64_t* find_pte(uint64_t*, uint64_t);
 
 #define VM_ANON  0x1
 #define VM_READ  0x2

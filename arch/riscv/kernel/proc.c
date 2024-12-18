@@ -245,7 +245,7 @@ void schedule() {
 }
 
 uint64_t do_fork(struct pt_regs* regs) {
-    Log("[S] Forking process");
+    Log("[S] " YELLOW "Forking process" CLEAR);
 
     struct task_struct* child = (struct task_struct*)alloc_page();
     // 1. Copy kernel stack - deep copy task_struct
@@ -271,29 +271,43 @@ uint64_t do_fork(struct pt_regs* regs) {
         // If this vma has page table, deep copy it
         uint64_t start = PGROUNDDOWN(vma->vm_start);
         for (uint64_t addr = start; addr < vma->vm_end; addr += PGSIZE) {
-            uint64_t pte = find_pte((uint64_t*)(current->pgd + PA2VA_OFFSET), addr);
-            if ((pte & PERM_V) == 0) continue;  // No page table entry found
-            uint64_t pa = ((pte >> 10) & PPN_MASK) << 12;
+            uint64_t* pte = find_pte((uint64_t*)(current->pgd + PA2VA_OFFSET), addr);
+            if ((*pte & PERM_V) == 0) continue;  // No page table entry found
+            uint64_t pa = ((*pte >> 10) & PPN_MASK) << 12;
 
-            // Otherwise, deep copy it
-            uint8_t* page = (uint8_t*)alloc_page();
-            memcpy((void*)page, (const void*)(pa + PA2VA_OFFSET), PGSIZE);
-            // Create Mapping
-            create_mapping((uint64_t*)pgd, addr, (uint64_t)(page - PA2VA_OFFSET), PGSIZE,
-                           pte & 0xff);
+            /* Eager Copy */
+            // // Otherwise, deep copy it
+            // uint8_t* page = (uint8_t*)alloc_page();
+            // memcpy((void*)page, (const void*)(pa + PA2VA_OFFSET), PGSIZE);
+            // // Create Mapping
+            // create_mapping((uint64_t*)pgd, addr, (uint64_t)(page - PA2VA_OFFSET), PGSIZE,
+            //                pte & 0xff);
+
+            // 1. Increase ref count
+            uint64_t err = get_page((void*)(pa + PA2VA_OFFSET));
+            if (err != NULL) {  // 还在 Go
+                Err("Trying to get a page that is not allocated");
+            } else {
+                /* Copy On Write */
+                Log(YELLOW "CoW:" BLUE " [%p, %p) -> [%p, %p), same as parent" CLEAR, pa,
+                    pa + PGSIZE, addr, addr + PGSIZE);
+                // Clear PTE_W for parent process
+                *pte &= ~PERM_W;
+                // Create Mapping for child process
+                create_mapping((uint64_t*)pgd, addr, pa, PGSIZE, (*pte & 0xff) & (~PERM_W));
+            }
         }
 
         vma = vma->vm_next;
     }
+    /* Copy On Write: Need flush TLB */
+    asm volatile("sfence.vma");
+
     // 3. Handle process return
     //  3.1 Child Process
     uint64_t sp_offset = (uint64_t)current + PGSIZE - (uint64_t)regs;
-    Log("sp_offset: %p", sp_offset);
 
     struct pt_regs* child_regs = (struct pt_regs*)((uint64_t)child + PGSIZE - sp_offset);
-
-    // Err("Child regs: %p, a0: %x, a0: %x", child_regs, child_regs->x[REG_IDX_SP],
-    //     regs->x[REG_IDX_A0]);
 
     child->thread.ra          = (uint64_t)__ret_from_fork;
     child->thread.sp          = (uint64_t)child_regs;
