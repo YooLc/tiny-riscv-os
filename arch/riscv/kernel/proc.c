@@ -39,10 +39,10 @@ void load_elf(struct task_struct* task) {
         // memsz may differ from filesz
         uint64_t filesz = phdr->p_filesz;
         uint64_t memsz  = phdr->p_memsz;
-        uint64_t pgoff = phdr->p_offset;  // offset from the beginning of the file at which the first
-                                          // byte of the segment resides
-        uint64_t addr = phdr->p_vaddr;    // virtual address at which the first byte of the segment
-                                          // resides in memory.
+        uint64_t pgoff  = phdr->p_offset;  // offset from the beginning of the file at which the
+                                          // first byte of the segment resides
+        uint64_t addr = phdr->p_vaddr;     // virtual address at which the first byte of the segment
+                                           // resides in memory.
 
         // Get permission
         uint64_t flags = 0;
@@ -107,6 +107,9 @@ void task_init() {
         task[nr_tasks]->thread.sp       = (uint64_t)((uint8_t*)task[i] + PGSIZE);
         task[nr_tasks]->thread.sstatus  = SSTATUS_SUM;
         task[nr_tasks]->thread.sscratch = USER_END;
+
+        // 4. Init files_struct
+        task[nr_tasks]->files = file_init();
 
         // User Space Page Table
         uint8_t* pgd        = (uint8_t*)alloc_page();

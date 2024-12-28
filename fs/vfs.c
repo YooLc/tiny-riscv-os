@@ -1,8 +1,9 @@
-#include "fs.h"
 #include "vfs.h"
-#include "sbi.h"
+
 #include "defs.h"
+#include "fs.h"
 #include "printk.h"
+#include "sbi.h"
 
 char uart_getchar() {
     char ret;
@@ -15,19 +16,30 @@ char uart_getchar() {
     return ret;
 }
 
-int64_t stdin_read(struct file *file, void *buf, uint64_t len) {
-    // todo: use uart_getchar() to get `len` chars
+int64_t stdin_read(struct file* file, void* buf, uint64_t len) {
+    for (size_t i = 0; i < len; i++) {
+        ((char*)buf)[i] = uart_getchar();
+    }
+    return len;
 }
 
-int64_t stdout_write(struct file *file, const void *buf, uint64_t len) {
+int64_t stdout_write(struct file* file, const void* buf, uint64_t len) {
     char to_print[len + 1];
     for (int i = 0; i < len; i++) {
-        to_print[i] = ((const char *)buf)[i];
+        to_print[i] = ((const char*)buf)[i];
     }
     to_print[len] = 0;
     return printk(buf);
 }
 
-int64_t stderr_write(struct file *file, const void *buf, uint64_t len) {
-    // todo
+int64_t stderr_write(struct file* file, const void* buf, uint64_t len) {
+    char to_print[len + 1];
+    for (int i = 0; i < len; i++) {
+        to_print[i] = ((const char*)buf)[i];
+    }
+    to_print[len] = 0;
+    printk(RED);
+    int ret = printk(buf);
+    printk(CLEAR);
+    return ret;
 }

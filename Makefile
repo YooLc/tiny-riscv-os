@@ -20,6 +20,7 @@ all: clean
 	$(MAKE) -C lib all
 	$(MAKE) -C init all
 	$(MAKE) -C user all
+	$(MAKE) -C fs all
 	$(MAKE) -C arch/riscv all
 	@echo -e '\n'Build Finished OK
 
@@ -35,6 +36,7 @@ clean:
 	$(MAKE) -C lib clean
 	$(MAKE) -C init clean
 	$(MAKE) -C user clean
+	$(MAKE) -C fs clean
 	$(MAKE) -C arch/riscv clean
 	$(shell test -f vmlinux && rm vmlinux)
 	$(shell test -f vmlinux.asm && rm vmlinux.asm)

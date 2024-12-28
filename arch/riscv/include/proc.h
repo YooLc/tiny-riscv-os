@@ -1,6 +1,7 @@
 #ifndef __PROC_H__
 #define __PROC_H__
 
+#include "fs.h"
 #include "stdint.h"
 #include "vm.h"
 
@@ -32,6 +33,7 @@ struct task_struct {
     uint64_t pid;
 
     struct thread_struct thread;
+    struct files_struct* files;
     uint8_t* pgd;
     struct mm_struct mm;
 };
