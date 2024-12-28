@@ -3,3 +3,4 @@ fw_jump.*
 .gdb_history
 *.log
 .vscode/
+*.img

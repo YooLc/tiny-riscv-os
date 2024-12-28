@@ -1,9 +1,8 @@
 ASM_SRC		= $(filter-out uapp.S, $(sort $(wildcard *.S)))
 C_SRC		= $(sort $(wildcard *.c))
 OBJ			= $(patsubst %.S,%.o,$(ASM_SRC)) $(patsubst %.c,%.o,$(C_SRC))
-TEST        = PFH1
 
-CFLAG		= -march=$(ISA) -mabi=$(ABI) -mcmodel=medany -fno-builtin -ffunction-sections -fdata-sections -nostartfiles -nostdlib -nostdinc -static -lgcc -Wl,--nmagic,--build-id=none -Wl,--no-relax $(INCLUDE) -D$(TEST)
+CFLAG		= -march=$(ISA) -mabi=$(ABI) -mcmodel=medany -fno-builtin -ffunction-sections -fdata-sections -nostartfiles -nostdlib -nostdinc -static -lgcc -Wl,--nmagic,--build-id=none -O0
 
 all: uapp.o
 
