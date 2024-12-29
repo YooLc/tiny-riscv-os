@@ -7,6 +7,7 @@
 #include "stddef.h"
 #include "stdint.h"
 #include "string.h"
+#include "virtio.h"
 
 extern uint8_t _stext[];
 extern uint8_t _etext[];
@@ -167,6 +168,10 @@ void setup_vm_final() {
     create_mapping(swapper_pg_dir, (uint64_t)_sramdisk, (uint64_t)(_sramdisk - PA2VA_OFFSET),
                    (_eramdisk - _sramdisk), PERM_A | PERM_R | PERM_W | PERM_X | PERM_V);
 
+    // Set up virtio
+    create_mapping(swapper_pg_dir, io_to_virt(VIRTIO_START), VIRTIO_START,
+                   VIRTIO_SIZE * VIRTIO_COUNT, PERM_A | PERM_R | PERM_W | PERM_V);
+
     // set satp with swapper_pg_dir
     uint64_t swapper_pg_dir_pa = (uint64_t)swapper_pg_dir - PA2VA_OFFSET;
     uint64_t satp              = (0x8L << 60) | ((swapper_pg_dir_pa >> 12) & PPN_MASK);
@@ -236,8 +241,8 @@ uint64_t do_mmap(struct mm_struct* mm, uint64_t addr, uint64_t len, uint64_t vm_
 }
 
 void do_page_fault(struct pt_regs* regs) {
-    Log("[S] " YELLOW "Handling Page Fault" BLUE " sepc = %p, stval = %p, scause = %p", regs->sepc, csr_read(stval),
-        csr_read(scause));
+    Log("[S] " YELLOW "Handling Page Fault" BLUE " sepc = %p, stval = %p, scause = %p", regs->sepc,
+        csr_read(stval), csr_read(scause));
 
     uint64_t bad_addr          = csr_read(stval);
     struct vm_area_struct* vma = find_vma(&current->mm, bad_addr);

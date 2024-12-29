@@ -25,6 +25,9 @@ _start:
     # Otherwise might encounter null pointer dereference in schedule
     call task_init
 
+    call virtio_dev_init
+    call mbr_init
+
     # set stvec = _traps
     la t0, _traps
     csrw stvec, t0

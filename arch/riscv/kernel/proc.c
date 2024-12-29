@@ -40,7 +40,7 @@ void load_elf(struct task_struct* task) {
         uint64_t filesz = phdr->p_filesz;
         uint64_t memsz  = phdr->p_memsz;
         uint64_t pgoff  = phdr->p_offset;  // offset from the beginning of the file at which the
-                                          // first byte of the segment resides
+                                           // first byte of the segment resides
         uint64_t addr = phdr->p_vaddr;     // virtual address at which the first byte of the segment
                                            // resides in memory.
 
@@ -233,8 +233,8 @@ void schedule() {
             // Set their counter to their priority, and reschedule
             for (size_t i = 1; i < nr_tasks; i++) {
                 task[i]->counter = task[i]->priority;
-                printk("SET [PID = %lld PRIORITY = %lld COUNTER = %lld]\n", i, task[i]->priority,
-                       task[i]->counter);
+                Log("SET [PID = %lld PRIORITY = %lld COUNTER = %lld]\n", i, task[i]->priority,
+                    task[i]->counter);
             }
             continue;
         }
