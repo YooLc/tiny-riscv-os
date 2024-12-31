@@ -4,29 +4,27 @@
 
 struct sbiret sbi_ecall(uint64_t eid, uint64_t fid, uint64_t arg0, uint64_t arg1, uint64_t arg2,
                         uint64_t arg3, uint64_t arg4, uint64_t arg5) {
-    asm volatile(
-        "mv a7, %[eid]\n"
-        "mv a6, %[fid]\n"
-        "mv a0, %[arg0]\n"
-        "mv a1, %[arg1]\n"
-        "mv a2, %[arg2]\n"
-        "mv a3, %[arg3]\n"
-        "mv a4, %[arg4]\n"
-        "mv a5, %[arg5]\n"
-        : 
-        : [eid] "r" (eid), [fid] "r" (fid),
-          [arg0] "r" (arg0), [arg1] "r" (arg1), [arg2] "r" (arg2),
-          [arg3] "r" (arg3), [arg4] "r" (arg4), [arg5] "r" (arg5)
-        : "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7"
-    );
-
-    asm volatile("ecall");
 
     struct sbiret ret_val;
-    asm volatile(
-        "mv %[error], a0\n" "mv %[value], a1\n"
-        : [error] "=r"(ret_val.error), [value] "=r"(ret_val.value));
+    uint64_t error, value;
 
+    // Bind arguments to registers as per the RISC-V calling convention
+    register uint64_t a0 asm("a0") = arg0;
+    register uint64_t a1 asm("a1") = arg1;
+    register uint64_t a2 asm("a2") = arg2;
+    register uint64_t a3 asm("a3") = arg3;
+    register uint64_t a4 asm("a4") = arg4;
+    register uint64_t a5 asm("a5") = arg5;
+    register uint64_t a6 asm("a6") = fid;
+    register uint64_t a7 asm("a7") = eid;
+
+    asm volatile("ecall"
+        : "+r"(a0), "+r"(a1)
+        : "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6), "r"(a7)
+        : "memory");
+
+    ret_val.error = a0;
+    ret_val.value = a1;
     return ret_val;
 }
 
