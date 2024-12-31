@@ -77,8 +77,15 @@ void to_upper_case(char* str) {  // util function to be used in fat32_open_file
 #define FAT_DIRENT_DIRECTORY  0x2e  // Not used in this lab
 
 struct fat32_file fat32_open_file(const char* path) {
-    struct fat32_file file;
-    /* todo: open the file according to path */
+    struct fat32_file file = {
+        .cluster = 0,
+        .dir     = {
+            .cluster = 0,
+            .index   = 0,
+        },
+    };
+
+    /* open the file according to path */
     to_upper_case(path);
     char filename[9] = "        ";
     for (size_t i = 0; i < 8; i++) {
@@ -89,6 +96,7 @@ struct fat32_file fat32_open_file(const char* path) {
     virtio_blk_read_sector(fat32_volume.first_data_sec, fat32_buf);
 
     size_t entry = 0;
+    bool found   = false;
     for (struct fat32_dir_entry* entry_ptr = (struct fat32_dir_entry*)fat32_buf;
          *(uint8_t*)entry_ptr != FAT_DIRENT_NEVER_USED; entry++, entry_ptr++) {
         if (*(uint8_t*)entry_ptr == FAT_DIRENT_DELETED) continue;
@@ -96,11 +104,16 @@ struct fat32_file fat32_open_file(const char* path) {
             file.cluster     = entry_ptr->starthi << 16 | entry_ptr->startlow;
             file.dir.cluster = 2;  // Root directory
             file.dir.index   = entry;
+            found            = true;
             break;
         }
     }
     Log("file: %s, cluster: %x, dir.cluster: %x, dir.index: %x", filename, file.cluster,
         file.dir.cluster, file.dir.index);
+
+    if (!found) {
+        Log("fat32_open_file: file not found\n");
+    }
     return file;
 }
 
