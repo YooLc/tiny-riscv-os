@@ -16,3 +16,7 @@ This is a course lab project for [ZJU CS3104M Operating System](https://zju-sec.
 nix develop .
 make -j$(nproc) run
 ```
+
+## Notes
+
+Please be aware of [Code of Academic Honesty](https://www.zhihu.com/question/68235594/answer/261395370).
